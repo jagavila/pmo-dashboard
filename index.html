@@ -1,0 +1,561 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PMO Ticket Board</title>
+<style>
+:root {
+  --bg: #f6f5fb; --surface: #ffffff; --surface-2: #f0eef8; --border: #e2dfee;
+  --text: #1e1b2e; --muted: #6b6880; --primary: #4f3fd1; --primary-soft: #e9e6fb; --on-primary: #ffffff;
+  --st-backlog: #9a97aa; --st-ready: #2b7bb9; --st-progress: #e08a13; --st-review: #c2417a;
+  --st-done: #2e9e6a; --st-dropped: #b8b5c4; --danger: #c0392b; --shadow: 0 8px 28px rgba(30, 27, 46, .14);
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #13121a; --surface: #1c1a26; --surface-2: #252233; --border: #33304a;
+    --text: #eceaf5; --muted: #9c99b0; --primary: #8f82ff; --primary-soft: #2b2650; --on-primary: #13121a;
+    --st-backlog: #7d7a90; --st-ready: #5aa7e0; --st-progress: #f0a640; --st-review: #e36a9f;
+    --st-done: #4cc28b; --st-dropped: #5d5a70; --danger: #ef6b5b; --shadow: 0 8px 28px rgba(0, 0, 0, .5);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #13121a; --surface: #1c1a26; --surface-2: #252233; --border: #33304a;
+  --text: #eceaf5; --muted: #9c99b0; --primary: #8f82ff; --primary-soft: #2b2650; --on-primary: #13121a;
+  --st-backlog: #7d7a90; --st-ready: #5aa7e0; --st-progress: #f0a640; --st-review: #e36a9f;
+  --st-done: #4cc28b; --st-dropped: #5d5a70; --danger: #ef6b5b; --shadow: 0 8px 28px rgba(0, 0, 0, .5);
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--bg); color: var(--text);
+  font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+a { color: var(--primary); }
+button, input, select, textarea { font: inherit; color: inherit; }
+.top {
+  position: sticky; top: 0; z-index: 10; display: flex; flex-wrap: wrap; gap: 12px 20px;
+  align-items: center; justify-content: space-between; padding: 12px 20px;
+  background: var(--surface); border-bottom: 1px solid var(--border);
+}
+.brand { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; min-width: 0; }
+.brand h1 { margin: 0; font-size: 22px; color: var(--primary); letter-spacing: -.01em; }
+.brand .sub { color: var(--muted); }
+.live {
+  display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px;
+  background: var(--primary-soft); color: var(--primary); font-size: 12px; font-weight: 600; border: 0; cursor: pointer;
+}
+.live i { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.live.err { color: var(--danger); }
+.tools { position: relative; display: flex; gap: 8px; flex: 1 1 360px; justify-content: flex-end; min-width: 0; }
+.search {
+  display: flex; align-items: center; gap: 8px; flex: 1 1 auto; max-width: 380px; min-width: 0;
+  padding: 0 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface);
+}
+.search input { border: 0; outline: 0; background: transparent; padding: 9px 0; width: 100%; min-width: 0; }
+.search:focus-within { border-color: var(--primary); }
+.btn {
+  display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 8px; cursor: pointer;
+  border: 1px solid var(--border); background: var(--surface-2); font-weight: 600; white-space: nowrap;
+}
+.btn.on, .btn.primary { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
+svg { flex: none; }
+
+.pop {
+  position: absolute; right: 0; top: calc(100% + 8px); width: min(340px, calc(100vw - 32px));
+  max-height: calc(100vh - 90px); overflow: auto; padding: 18px; border-radius: 14px;
+  background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow);
+}
+.pop-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
+.pop-head h2 { margin: 0; font-size: 18px; }
+.link { background: none; border: 0; padding: 0; color: var(--primary); text-decoration: underline; cursor: pointer; }
+.pop h3, .side-head h2, .list-title {
+  margin: 16px 0 8px; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted);
+}
+.seg { display: flex; flex-wrap: wrap; gap: 4px; padding: 4px; border-radius: 10px; background: var(--surface-2); }
+.seg button {
+  flex: 1 1 auto; padding: 6px 10px; border: 0; border-radius: 8px; background: none; cursor: pointer; font-weight: 600;
+}
+.seg button.on { background: var(--primary); color: var(--on-primary); }
+.field { width: 100%; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); }
+.checks { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; }
+.checks label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+.checks .ico { color: var(--primary); }
+.checks input { accent-color: var(--primary); width: 16px; height: 16px; margin: 0; }
+
+.banner { margin: 12px 20px 0; padding: 10px 14px; border-radius: 10px; background: var(--surface); border: 1px solid var(--danger); color: var(--danger); }
+.layout { display: grid; grid-template-columns: 330px minmax(0, 1fr); gap: 16px; padding: 16px 20px; align-items: start; }
+.panel { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; min-width: 0; }
+.side { position: sticky; top: 76px; max-height: calc(100vh - 92px); display: flex; flex-direction: column; }
+.side-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 14px 10px; border-bottom: 1px solid var(--border); }
+.side-head h2 { margin: 10px 0 0; color: var(--primary); }
+.side-head select { width: auto; margin-top: 8px; }
+.sprints { list-style: none; margin: 0; padding: 6px; overflow: auto; }
+.sprint {
+  display: grid; grid-template-columns: 18px 1fr; gap: 2px 8px; width: 100%; text-align: left; padding: 10px;
+  border: 0; border-radius: 10px; background: none; cursor: pointer;
+}
+.sprint:hover { background: var(--surface-2); }
+.sprint.on { background: var(--primary-soft); }
+.sprint .ico { margin-top: 2px; color: var(--primary); }
+.sprint .name { font-weight: 600; }
+.sprint .meta { grid-column: 2; display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; }
+.sprint .meta .bar { width: 56px; }
+.sprint .meta .tag { margin-left: auto; }
+.tag { font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 999px; background: var(--surface-2); color: var(--muted); white-space: nowrap; }
+.bar { height: 5px; border-radius: 3px; background: var(--surface-2); overflow: hidden; flex: none; }
+.bar > span { display: block; height: 100%; background: var(--primary); }
+.empty { padding: 24px; color: var(--muted); text-align: center; }
+
+.detail { padding: 20px; }
+.d-head { display: flex; gap: 10px; align-items: flex-start; }
+.d-head .ico { margin-top: 6px; color: var(--primary); }
+.d-head h2 { margin: 0; font-size: 26px; line-height: 1.2; color: var(--primary); }
+.d-meta { margin: 6px 0 14px 30px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 4px 10px; }
+.stack { display: flex; height: 10px; border-radius: 5px; overflow: hidden; background: var(--surface-2); gap: 2px; }
+.stack span { display: block; height: 100%; }
+.counts { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 10px 0 18px; }
+.counts b { font-weight: 700; }
+.dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 5px; vertical-align: 0; flex: none; }
+.d-body { display: grid; grid-template-columns: 340px minmax(0, 1fr); gap: 16px; align-items: start; }
+.list { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+.list-head { display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: var(--surface-2); border-bottom: 1px solid var(--border); }
+.list-head label { font-weight: 600; color: var(--primary); }
+.list-title { margin: 0; padding: 10px 12px 6px; }
+.tickets { list-style: none; margin: 0; padding: 0; max-height: 620px; overflow: auto; }
+.ticket {
+  display: grid; grid-template-columns: 14px auto 1fr; gap: 0 8px; align-items: start; width: 100%; text-align: left;
+  padding: 9px 12px; border: 0; border-top: 1px solid var(--border); background: none; cursor: pointer;
+}
+.ticket:hover { background: var(--surface-2); }
+.ticket .dot { margin: 5px 0 0; }
+.tid { font-weight: 700; color: var(--primary); white-space: nowrap; }
+.ticket .ttl { min-width: 0; overflow-wrap: anywhere; }
+.ticket .ttl small { display: block; color: var(--muted); }
+.board {
+  display: grid; grid-auto-flow: column; grid-auto-columns: minmax(165px, 1fr); gap: 10px; overflow-x: auto;
+  padding: 12px; border-radius: 12px; border: 1px solid var(--border);
+  background: radial-gradient(var(--border) 1px, transparent 1px) 0 0 / 16px 16px, var(--surface-2);
+}
+.col { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.col h4 { display: flex; align-items: center; justify-content: space-between; margin: 0 0 2px; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; }
+.col h4 span:last-child { color: var(--muted); }
+.card {
+  display: block; padding: 10px; border-radius: 10px; background: var(--surface); border: 1px solid var(--border);
+  border-left: 4px solid var(--c); text-decoration: none; color: var(--text); transition: box-shadow .2s;
+}
+.card:hover { box-shadow: var(--shadow); }
+.card.flash { outline: 2px solid var(--primary); outline-offset: 2px; }
+.card .row { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+.card .who { margin-left: auto; color: var(--muted); font-size: 12px; }
+.card.dropped .t { text-decoration: line-through; color: var(--muted); }
+.col .none { color: var(--muted); font-size: 12px; padding: 6px 2px; }
+.hint { margin: 10px 0 0; color: var(--muted); font-size: 12px; }
+
+dialog { width: min(520px, calc(100vw - 32px)); border: 1px solid var(--border); border-radius: 14px; background: var(--surface); color: var(--text); padding: 20px; box-shadow: var(--shadow); }
+dialog::backdrop { background: rgba(10, 8, 20, .45); }
+dialog h2 { margin: 0 0 6px; }
+dialog label { display: block; margin: 14px 0 6px; font-weight: 600; }
+dialog p { margin: 4px 0; color: var(--muted); font-size: 13px; }
+dialog textarea { min-height: 110px; resize: vertical; font-family: ui-monospace, Consolas, monospace; }
+dialog .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+
+@media (max-width: 1150px) { .d-body { grid-template-columns: minmax(0, 1fr); } .tickets { max-height: 360px; } }
+@media (max-width: 860px) {
+  .top { padding: 12px 16px; }
+  .layout { grid-template-columns: minmax(0, 1fr); padding: 12px 16px; }
+  .side { position: static; max-height: 380px; }
+  .detail { padding: 16px; }
+  .d-head h2 { font-size: 21px; }
+  .d-meta { margin-left: 0; }
+  .search { max-width: none; }
+  .btn .lbl { display: none; }
+}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <h1>Tickets</h1>
+    <span class="sub" id="summary">Not connected</span>
+    <button class="live" id="live" title="Click to refresh now"><i></i><span>Offline</span></button>
+  </div>
+  <div class="tools">
+    <label class="search">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input id="q" type="search" placeholder="Search by ID (T-049, #12) or text" aria-label="Search tickets">
+    </label>
+    <button class="btn" id="filtersBtn" aria-expanded="false">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 5h18l-7 8v6l-4-2v-4z"/></svg><span class="lbl">Filters</span>
+    </button>
+    <button class="btn" id="settingsBtn" title="Settings" aria-label="Settings">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+    </button>
+    <div class="pop" id="filters" hidden></div>
+  </div>
+</header>
+<div class="banner" id="error" hidden></div>
+<main class="layout">
+  <aside class="panel side">
+    <div class="side-head">
+      <h2>Sprints (<span id="sprintCount">0</span>)</h2>
+      <select class="field" id="sprintSort" aria-label="Sort sprints">
+        <option value="progress-asc">Least done first</option>
+        <option value="progress-desc">Most done first</option>
+        <option value="project">Project</option>
+        <option value="updated">Recently updated</option>
+      </select>
+    </div>
+    <ul class="sprints" id="sprints"></ul>
+  </aside>
+  <section class="panel detail" id="detail"></section>
+</main>
+
+<dialog id="settings">
+  <form method="dialog" id="settingsForm">
+    <h2>Connect to GitHub</h2>
+    <p>The token and repo list are stored only in this browser (localStorage) and sent only to api.github.com.</p>
+    <label for="token">Personal access token</label>
+    <input class="field" id="token" type="password" autocomplete="off" placeholder="ghp_…">
+    <p>Classic token with <b>repo</b> and <b>read:project</b> scopes. Without read:project, ticket status falls back to open / closed.</p>
+    <label for="repos">Project repositories</label>
+    <textarea class="field" id="repos" placeholder="owner/repo&#10;owner/other-repo"></textarea>
+    <p>One <code>owner/repo</code> per line (the <code>github_repo</code> from each project's pmo.yaml).</p>
+    <div class="actions">
+      <button class="btn" value="cancel" formnovalidate>Cancel</button>
+      <button class="btn primary" value="save">Save &amp; load</button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+const STAGES = ['Backlog', 'Ready', 'In progress', 'In review', 'Done', 'Dropped'];
+const STAGE_VAR = { 'Backlog': '--st-backlog', 'Ready': '--st-ready', 'In progress': '--st-progress', 'In review': '--st-review', 'Done': '--st-done', 'Dropped': '--st-dropped' };
+const SPRINT_STATES = [['progress', 'In progress'], ['new', 'Not started'], ['done', 'Complete'], ['loose', 'No sprint']];
+const REFRESH_MS = 5 * 60 * 1000;
+
+const store = {
+  get(k, d) { try { const v = localStorage.getItem('pmo-dashboard:' + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { localStorage.setItem('pmo-dashboard:' + k, JSON.stringify(v)); } catch {} },
+};
+const defaultFilters = () => ({
+  project: 'all', sp: 'all', type: 'all',
+  sprint: { progress: true, new: true, done: true, loose: true },
+  stage: Object.fromEntries(STAGES.map((s) => [s, true])),
+});
+let cfg = store.get('cfg', { token: '', repos: [] });
+let filters = Object.assign(defaultFilters(), store.get('filters', {}));
+let ui = Object.assign({ selected: null, sprintSort: 'progress-asc', ticketSort: 'id' }, store.get('ui', {}));
+let data = { repos: [], sprints: [], tickets: [], warnings: [] };
+let query = '';
+let timer = null;
+
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const color = (stage) => `var(${STAGE_VAR[stage]})`;
+const short = (full) => full.split('/')[1] || full;
+
+// ---- GitHub ------------------------------------------------------------------
+const issueFields = (withProject) => `
+  number title state stateReason url updatedAt
+  milestone { number }
+  labels(first: 20) { nodes { name } }
+  assignees(first: 3) { nodes { login } }
+  ${withProject ? 'projectItems(first: 5) { nodes { fieldValueByName(name: "Status") { ... on ProjectV2ItemFieldSingleSelectValue { name } } } }' : ''}`;
+const repoQuery = (withProject) => `query($owner: String!, $name: String!, $after: String) {
+  repository(owner: $owner, name: $name) {
+    nameWithOwner url
+    milestones(first: 100, states: [OPEN, CLOSED]) { nodes { number title state url } }
+    issues(first: 100, after: $after) { pageInfo { hasNextPage endCursor } nodes { ${issueFields(withProject)} } }
+  }
+}`;
+
+async function gql(query, variables) {
+  const r = await fetch('https://api.github.com/graphql', {
+    method: 'POST',
+    headers: { Authorization: 'bearer ' + cfg.token, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query, variables }),
+  });
+  if (!r.ok) throw new Error(`GitHub answered ${r.status}${r.status === 401 ? ' (check the token)' : ''}`);
+  return r.json();
+}
+
+async function fetchRepo(full) {
+  const [owner, name] = full.split('/');
+  let withProject = true, after = null, issues = [], repo = null;
+  for (;;) {
+    const res = await gql(repoQuery(withProject), { owner, name, after });
+    if (res.errors && withProject && /project/i.test(JSON.stringify(res.errors))) {
+      withProject = false; after = null; issues = [];
+      continue;
+    }
+    if (res.errors) throw new Error(full + ': ' + res.errors.map((e) => e.message).join('; '));
+    repo = res.data.repository;
+    issues.push(...repo.issues.nodes);
+    if (!repo.issues.pageInfo.hasNextPage) break;
+    after = repo.issues.pageInfo.endCursor;
+  }
+  return { full: repo.nameWithOwner, url: repo.url, milestones: repo.milestones.nodes, issues, withProject };
+}
+
+// ---- model -------------------------------------------------------------------
+function stageOf(i) {
+  if (i.state === 'CLOSED') return i.stateReason === 'NOT_PLANNED' ? 'Dropped' : 'Done';
+  const s = (i.projectItems?.nodes || []).map((n) => n?.fieldValueByName?.name).find((n) => STAGES.includes(n));
+  return s || 'Backlog';
+}
+
+function build(repos) {
+  const sprints = [], tickets = [];
+  for (const r of repos) {
+    const byMs = new Map();
+    for (const m of r.milestones) {
+      const p = m.title.match(/^(SP-\d+)\/(S\d+)\s*(.*)$/);
+      const s = { id: r.full + '#m' + m.number, repo: r.full, key: p ? p[1] + '/' + p[2] : '', sp: p ? p[1] : '', name: (p && p[3]) || m.title, url: m.url, closed: m.state === 'CLOSED', loose: false, tickets: [] };
+      byMs.set(m.number, s); sprints.push(s);
+    }
+    const loose = { id: r.full + '#none', repo: r.full, key: '', sp: '', name: 'No sprint', url: r.url + '/issues?q=is%3Aissue+no%3Amilestone', closed: false, loose: true, tickets: [] };
+    for (const i of r.issues) {
+      const labels = i.labels.nodes.map((l) => l.name);
+      const idm = i.title.match(/^(T-\d+):\s*(.*)$/);
+      const sprint = (i.milestone && byMs.get(i.milestone.number)) || loose;
+      const t = {
+        repo: r.full, num: i.number, id: idm ? idm[1] : '#' + i.number, title: idm ? idm[2] : i.title, url: i.url,
+        stage: stageOf(i), updatedAt: i.updatedAt, sprint,
+        type: (labels.find((l) => l.startsWith('type:')) || '').slice(5),
+        sp: (labels.find((l) => l.startsWith('sp:')) || '').slice(3) || sprint.sp,
+        who: i.assignees.nodes.map((a) => a.login),
+      };
+      sprint.tickets.push(t); tickets.push(t);
+    }
+    if (loose.tickets.length) sprints.push(loose);
+  }
+  for (const s of sprints) {
+    const n = s.tickets.length;
+    s.done = s.tickets.filter((t) => t.stage === 'Done' || t.stage === 'Dropped').length;
+    s.progress = n ? s.done / n : (s.closed ? 1 : 0);
+    s.updated = s.tickets.reduce((m, t) => (t.updatedAt > m ? t.updatedAt : m), '');
+    if (!s.sp) s.sp = s.tickets.find((t) => t.sp)?.sp || '';
+    s.state = s.loose ? 'loose'
+      : (n ? s.done === n : s.closed) ? 'done'
+      : s.tickets.some((t) => t.stage !== 'Backlog' && t.stage !== 'Ready') ? 'progress' : 'new';
+  }
+  return { repos, sprints, tickets, warnings: repos.filter((r) => !r.withProject).map((r) => r.full) };
+}
+
+async function load() {
+  clearTimeout(timer);
+  if (!cfg.token || !cfg.repos.length) { render(); $('settings').showModal(); return; }
+  setLive('Loading…');
+  try {
+    const repos = await Promise.all(cfg.repos.map(fetchRepo));
+    data = build(repos);
+    $('error').hidden = true;
+    setLive('Live · ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+  } catch (e) {
+    $('error').textContent = e.message;
+    $('error').hidden = false;
+    setLive('Offline', true);
+  }
+  render();
+  timer = setTimeout(load, REFRESH_MS);
+}
+
+function setLive(text, err) {
+  $('live').querySelector('span').textContent = text;
+  $('live').classList.toggle('err', !!err);
+}
+
+// ---- filtering ---------------------------------------------------------------
+function matchesQuery(t) {
+  if (!query) return true;
+  const q = query.toLowerCase();
+  if (/^#\d+$/.test(q)) return '#' + t.num === q;
+  return t.id.toLowerCase() === q || (t.id + ' ' + t.title + ' ' + t.sprint.name).toLowerCase().includes(q);
+}
+const inScope = (x) => (filters.project === 'all' || x.repo === filters.project) && (filters.sp === 'all' || x.sp === filters.sp);
+const ticketVisible = (t) => inScope(t) && filters.stage[t.stage] && (filters.type === 'all' || t.type === filters.type) && matchesQuery(t);
+
+function visibleSprints() {
+  const narrowed = query || filters.type !== 'all';
+  const list = data.sprints.filter((s) => inScope(s) && filters.sprint[s.state] && (!narrowed || s.tickets.some(ticketVisible)));
+  const by = {
+    'progress-asc': (a, b) => a.progress - b.progress,
+    'progress-desc': (a, b) => b.progress - a.progress,
+    'project': (a, b) => a.repo.localeCompare(b.repo) || a.key.localeCompare(b.key),
+    'updated': (a, b) => b.updated.localeCompare(a.updated),
+  }[ui.sprintSort];
+  return list.sort((a, b) => a.loose - b.loose || by(a, b) || a.repo.localeCompare(b.repo) || a.key.localeCompare(b.key));
+}
+
+// ---- rendering ---------------------------------------------------------------
+function icon(state, size = 16) {
+  const c = size / 2, r = c - 1.5;
+  const ring = `<circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="currentColor" stroke-width="1.6"${state === 'loose' ? ' stroke-dasharray="2 2"' : ''}/>`;
+  const fill = state === 'done' ? `<circle cx="${c}" cy="${c}" r="${r}" fill="currentColor"/>`
+    : state === 'progress' ? `<path d="M${c} ${c - r}A${r} ${r} 0 0 1 ${c} ${c + r}Z" fill="currentColor"/>` : '';
+  return `<svg class="ico" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" aria-hidden="true">${ring}${fill}</svg>`;
+}
+
+function render() {
+  const open = data.tickets.filter((t) => t.stage !== 'Done' && t.stage !== 'Dropped').length;
+  $('summary').textContent = data.repos.length
+    ? `${data.repos.length} project${data.repos.length === 1 ? '' : 's'} · ${open} open ticket${open === 1 ? '' : 's'}`
+    : 'Not connected';
+  $('sprintSort').value = ui.sprintSort;
+  $('filtersBtn').classList.toggle('on', JSON.stringify(filters) !== JSON.stringify(defaultFilters()));
+  const sprints = visibleSprints();
+  if (!sprints.some((s) => s.id === ui.selected)) ui.selected = sprints[0]?.id || null;
+  $('sprintCount').textContent = sprints.length;
+  $('sprints').innerHTML = sprints.map((s) => `
+    <li><button class="sprint${s.id === ui.selected ? ' on' : ''}" data-sprint="${esc(s.id)}">
+      ${icon(s.state)}<span class="name">${esc(s.name)}</span>
+      <span class="meta"><span class="bar"><span style="width:${Math.round(s.progress * 100)}%"></span></span>
+        ${s.done} of ${s.tickets.length}<span class="tag">${esc(short(s.repo))}${s.key ? ' · ' + esc(s.key) : ''}</span></span>
+    </button></li>`).join('') || `<li class="empty">${data.repos.length ? 'No sprints match the filters.' : 'Open settings to connect your repos.'}</li>`;
+  renderDetail(sprints.find((s) => s.id === ui.selected));
+  if (!$('filters').hidden) renderFilters();
+  store.set('ui', ui);
+}
+
+function renderDetail(s) {
+  if (!s) { $('detail').innerHTML = `<div class="empty">Select a sprint.</div>`; return; }
+  const counts = Object.fromEntries(STAGES.map((st) => [st, s.tickets.filter((t) => t.stage === st).length]));
+  const n = s.tickets.length || 1;
+  const sorters = {
+    id: (a, b) => a.num - b.num,
+    updated: (a, b) => b.updatedAt.localeCompare(a.updatedAt),
+    stage: (a, b) => STAGES.indexOf(a.stage) - STAGES.indexOf(b.stage) || a.num - b.num,
+  };
+  const shown = s.tickets.filter(ticketVisible).sort(sorters[ui.ticketSort]);
+  const stages = STAGES.filter((st) => filters.stage[st]);
+  $('detail').innerHTML = `
+    <div class="d-head">${icon(s.state, 20)}<h2>${esc(s.name)}</h2></div>
+    <div class="d-meta"><span>${esc(s.repo)}</span>${s.key ? `<span>${esc(s.key)}</span>` : ''}${s.closed ? '<span>milestone closed</span>' : ''}<a href="${esc(s.url)}" target="_blank" rel="noopener">Open on GitHub ↗</a></div>
+    <div class="stack" role="img" aria-label="${s.done} of ${s.tickets.length} finished">
+      ${['Done', 'Dropped', 'In review', 'In progress', 'Ready'].filter((st) => counts[st]).map((st) => `<span style="width:${counts[st] / n * 100}%;background:${color(st)}" title="${st}: ${counts[st]}"></span>`).join('')}
+    </div>
+    <div class="counts"><span><b>${s.tickets.length}</b> ticket${s.tickets.length === 1 ? '' : 's'}</span>
+      ${STAGES.map((st) => `<span><i class="dot" style="background:${color(st)}"></i><b>${counts[st]}</b> ${st.toLowerCase()}</span>`).join('')}
+    </div>
+    <div class="d-body">
+      <div class="list">
+        <div class="list-head"><label for="ticketSort">Sort</label>
+          <select class="field" id="ticketSort">
+            <option value="id">Issue number</option><option value="updated">Recently updated</option><option value="stage">Status</option>
+          </select></div>
+        <div class="list-title">Tickets (${shown.length})</div>
+        <ul class="tickets">${shown.map((t) => `
+          <li><button class="ticket" data-ticket="${esc(t.repo + '#' + t.num)}">
+            <i class="dot" style="background:${color(t.stage)}" title="${t.stage}"></i>
+            <span class="tid">${esc(t.id)}</span>
+            <span class="ttl">${esc(t.title)}<small>${t.stage}${t.type ? ' · ' + esc(t.type) : ''}</small></span>
+          </button></li>`).join('') || '<li class="empty">No tickets match.</li>'}</ul>
+      </div>
+      <div>
+        <div class="board">${stages.map((st) => {
+          const cards = shown.filter((t) => t.stage === st);
+          return `<div class="col"><h4><span><i class="dot" style="background:${color(st)}"></i>${st}</span><span>${cards.length}</span></h4>
+            ${cards.map((t) => `<a class="card${st === 'Dropped' ? ' dropped' : ''}" style="--c:${color(st)}" id="card-${esc(t.repo + '#' + t.num)}" href="${esc(t.url)}" target="_blank" rel="noopener">
+              <div class="row"><span class="tid">${esc(t.id)}</span>${t.type ? `<span class="tag">${esc(t.type)}</span>` : ''}<span class="who">${esc(t.who.join(', '))}</span></div>
+              <div class="t">${esc(t.title)}</div></a>`).join('') || '<div class="none">—</div>'}</div>`;
+        }).join('')}</div>
+        <p class="hint">One column per status. Click a ticket in the list to find its card; click a card to open the issue.</p>
+      </div>
+    </div>`;
+  $('ticketSort').value = ui.ticketSort;
+}
+
+function renderFilters() {
+  const scoped = data.sprints.filter((s) => filters.project === 'all' || s.repo === filters.project);
+  const sps = [...new Set(scoped.map((s) => s.sp).filter(Boolean))].sort();
+  const types = [...new Set(data.tickets.map((t) => t.type).filter(Boolean))].sort();
+  const opt = (v, cur, label = v) => `<option value="${esc(v)}"${v === cur ? ' selected' : ''}>${esc(label)}</option>`;
+  const box = (group, key, label) => `<label><input type="checkbox" data-group="${group}" data-key="${esc(key)}"${filters[group][key] ? ' checked' : ''}>${label}</label>`;
+  $('filters').innerHTML = `
+    <div class="pop-head"><h2>Filters</h2><button class="link" data-act="clear">Clear</button></div>
+    <h3>Project</h3>
+    <div class="seg">${['all', ...data.repos.map((r) => r.full)].map((p) => `<button data-project="${esc(p)}" class="${filters.project === p ? 'on' : ''}">${p === 'all' ? 'All' : esc(short(p))}</button>`).join('')}</div>
+    <h3>Subproject</h3>
+    <select class="field" data-select="sp">${opt('all', filters.sp, 'All subprojects')}${sps.map((v) => opt(v, filters.sp)).join('')}</select>
+    <h3>Type</h3>
+    <select class="field" data-select="type">${opt('all', filters.type, 'All types')}${types.map((v) => opt(v, filters.type)).join('')}</select>
+    <h3>Sprints</h3>
+    <div class="checks">${SPRINT_STATES.map(([k, l]) => box('sprint', k, `${icon(k, 14)} ${l} (${scoped.filter((s) => s.state === k).length})`)).join('')}</div>
+    <h3>Tickets</h3>
+    <div class="checks">${STAGES.map((st) => box('stage', st, `<i class="dot" style="background:${color(st)}"></i>${st}`)).join('')}</div>`;
+}
+
+function setFilters(next) {
+  filters = next;
+  store.set('filters', filters);
+  render();
+}
+
+// ---- events ------------------------------------------------------------------
+$('sprints').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-sprint]');
+  if (b) { ui.selected = b.dataset.sprint; render(); }
+});
+$('detail').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-ticket]');
+  if (!b) return;
+  const card = document.getElementById('card-' + b.dataset.ticket);
+  if (!card) return;
+  card.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+  card.classList.add('flash');
+  setTimeout(() => card.classList.remove('flash'), 1400);
+});
+$('detail').addEventListener('change', (e) => {
+  if (e.target.id === 'ticketSort') { ui.ticketSort = e.target.value; render(); }
+});
+$('sprintSort').addEventListener('change', (e) => { ui.sprintSort = e.target.value; render(); });
+$('q').addEventListener('input', (e) => { query = e.target.value.trim(); render(); });
+$('live').addEventListener('click', load);
+
+$('filtersBtn').addEventListener('click', () => {
+  const pop = $('filters');
+  pop.hidden = !pop.hidden;
+  $('filtersBtn').setAttribute('aria-expanded', String(!pop.hidden));
+  if (!pop.hidden) renderFilters();
+});
+document.addEventListener('click', (e) => {
+  // composedPath, not closest: a click inside the popover re-renders it and detaches e.target.
+  if (!$('filters').hidden && !e.composedPath().some((n) => n === $('filters') || n === $('filtersBtn'))) {
+    $('filters').hidden = true;
+    $('filtersBtn').setAttribute('aria-expanded', 'false');
+  }
+});
+$('filters').addEventListener('click', (e) => {
+  const p = e.target.closest('[data-project]');
+  if (p) setFilters({ ...filters, project: p.dataset.project, sp: 'all' });
+  if (e.target.closest('[data-act="clear"]')) setFilters(defaultFilters());
+});
+$('filters').addEventListener('change', (e) => {
+  const el = e.target;
+  if (el.dataset.group) setFilters({ ...filters, [el.dataset.group]: { ...filters[el.dataset.group], [el.dataset.key]: el.checked } });
+  if (el.dataset.select) setFilters({ ...filters, [el.dataset.select]: el.value });
+});
+
+$('settingsBtn').addEventListener('click', () => {
+  $('token').value = cfg.token;
+  $('repos').value = cfg.repos.join('\n');
+  $('settings').showModal();
+});
+$('settings').addEventListener('close', () => {
+  if ($('settings').returnValue !== 'save') return;
+  cfg = {
+    token: $('token').value.trim(),
+    repos: [...new Set($('repos').value.split(/[\s,]+/).map((r) => r.trim().replace(/^https:\/\/github\.com\//, '').replace(/\/$/, '')).filter((r) => /^[\w.-]+\/[\w.-]+$/.test(r)))],
+  };
+  store.set('cfg', cfg);
+  load();
+});
+
+load();
+</script>
+</body>
+</html>
