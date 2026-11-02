@@ -268,7 +268,10 @@ const issueFields = (withProject) => `
   milestone { number }
   labels(first: 20) { nodes { name } }
   assignees(first: 3) { nodes { login } }
-  ${withProject ? 'projectItems(first: 5) { nodes { fieldValueByName(name: "Status") { ... on ProjectV2ItemFieldSingleSelectValue { name } } } }' : ''}`;
+  ${withProject ? `projectItems(first: 5) { nodes {
+    stage: fieldValueByName(name: "Stage") { ... on ProjectV2ItemFieldSingleSelectValue { name } }
+    status: fieldValueByName(name: "Status") { ... on ProjectV2ItemFieldSingleSelectValue { name } }
+  } }` : ''}`;
 const repoQuery = (withProject) => `query($owner: String!, $name: String!, $after: String) {
   repository(owner: $owner, name: $name) {
     nameWithOwner url
@@ -308,8 +311,13 @@ async function fetchRepo(full) {
 // ---- model -------------------------------------------------------------------
 function stageOf(i) {
   if (i.state === 'CLOSED') return i.stateReason === 'NOT_PLANNED' ? 'Dropped' : 'Done';
-  const s = (i.projectItems?.nodes || []).map((n) => n?.fieldValueByName?.name).find((n) => STAGES.includes(n));
-  return s || 'Backlog';
+  // /pmo:sync writes the "Stage" field; GitHub's built-in "Status" (Todo / In Progress / Done) is the fallback.
+  const names = (i.projectItems?.nodes || []).flatMap((n) => [n?.stage?.name, n?.status?.name]);
+  for (const n of names) {
+    const s = STAGES.find((st) => st.toLowerCase() === String(n).toLowerCase());
+    if (s) return s;
+  }
+  return 'Backlog';
 }
 
 function build(repos) {
