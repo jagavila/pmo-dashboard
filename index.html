@@ -237,7 +237,7 @@ dialog .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top
 const STAGES = ['Backlog', 'Ready', 'In progress', 'In review', 'Done', 'Dropped'];
 const STAGE_VAR = { 'Backlog': '--st-backlog', 'Ready': '--st-ready', 'In progress': '--st-progress', 'In review': '--st-review', 'Done': '--st-done', 'Dropped': '--st-dropped' };
 const SPRINT_STATES = [['progress', 'In progress'], ['new', 'Not started'], ['done', 'Complete'], ['loose', 'No sprint']];
-const REFRESH_MS = 5 * 60 * 1000;
+const REFRESH_MS = 60 * 1000;
 
 const store = {
   get(k, d) { try { const v = localStorage.getItem('pmo-dashboard:' + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
