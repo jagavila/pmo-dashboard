@@ -218,9 +218,11 @@ dialog .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top
   <form method="dialog" id="settingsForm">
     <h2>Connect to GitHub</h2>
     <p>The token and repo list are stored only in this browser (localStorage) and sent only to api.github.com.</p>
-    <label for="token">Personal access token</label>
-    <input class="field" id="token" type="password" autocomplete="off" placeholder="ghp_…">
-    <p>Classic token with <b>repo</b> and <b>read:project</b> scopes. Without read:project, ticket status falls back to open / closed.</p>
+    <div id="tokenField">
+      <label for="token">Personal access token</label>
+      <input class="field" id="token" type="password" autocomplete="off" placeholder="ghp_…">
+      <p>Classic token with <b>repo</b> and <b>read:project</b> scopes. Without read:project, ticket status falls back to open / closed.</p>
+    </div>
     <label for="repos">Project repositories</label>
     <textarea class="field" id="repos" placeholder="owner/repo&#10;owner/other-repo"></textarea>
     <p>One <code>owner/repo</code> per line (the <code>github_repo</code> from each project's pmo.yaml).</p>
@@ -252,6 +254,8 @@ let ui = Object.assign({ selected: null, sprintSort: 'progress-asc', ticketSort:
 let data = { repos: [], sprints: [], tickets: [], warnings: [] };
 let query = '';
 let timer = null;
+// Set when the page is served by serve.mjs: the server holds the token and may fix the repo list.
+let server = null;
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -274,9 +278,9 @@ const repoQuery = (withProject) => `query($owner: String!, $name: String!, $afte
 }`;
 
 async function gql(query, variables) {
-  const r = await fetch('https://api.github.com/graphql', {
+  const r = await fetch(server ? '/api/graphql' : 'https://api.github.com/graphql', {
     method: 'POST',
-    headers: { Authorization: 'bearer ' + cfg.token, 'Content-Type': 'application/json' },
+    headers: server ? { 'Content-Type': 'application/json' } : { Authorization: 'bearer ' + cfg.token, 'Content-Type': 'application/json' },
     body: JSON.stringify({ query, variables }),
   });
   if (!r.ok) throw new Error(`GitHub answered ${r.status}${r.status === 401 ? ' (check the token)' : ''}`);
@@ -348,7 +352,7 @@ function build(repos) {
 
 async function load() {
   clearTimeout(timer);
-  if (!cfg.token || !cfg.repos.length) { render(); $('settings').showModal(); return; }
+  if ((!server && !cfg.token) || !cfg.repos.length) { render(); openSettings(); return; }
   setLive('Loading…');
   try {
     const repos = await Promise.all(cfg.repos.map(fetchRepo));
@@ -540,22 +544,33 @@ $('filters').addEventListener('change', (e) => {
   if (el.dataset.select) setFilters({ ...filters, [el.dataset.select]: el.value });
 });
 
-$('settingsBtn').addEventListener('click', () => {
+function openSettings() {
+  $('tokenField').hidden = !!server;
   $('token').value = cfg.token;
   $('repos').value = cfg.repos.join('\n');
+  $('repos').disabled = !!server?.repos.length;
   $('settings').showModal();
-});
+}
+$('settingsBtn').addEventListener('click', openSettings);
 $('settings').addEventListener('close', () => {
   if ($('settings').returnValue !== 'save') return;
   cfg = {
     token: $('token').value.trim(),
     repos: [...new Set($('repos').value.split(/[\s,]+/).map((r) => r.trim().replace(/^https:\/\/github\.com\//, '').replace(/\/$/, '')).filter((r) => /^[\w.-]+\/[\w.-]+$/.test(r)))],
   };
-  store.set('cfg', cfg);
+  if (server?.repos.length) cfg.repos = server.repos;
+  store.set('cfg', server ? { token: '', repos: cfg.repos } : cfg);
   load();
 });
 
-load();
+(async () => {
+  try {
+    const r = await fetch('/api/config');
+    if (r.ok) server = await r.json();
+  } catch {}
+  if (server?.repos.length) cfg.repos = server.repos;
+  load();
+})();
 </script>
 </body>
 </html>
